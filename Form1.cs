@@ -13,16 +13,15 @@ namespace MinuEpood
         private SqlConnection _conn = new SqlConnection(@"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\opilane\source\repos\Poldsaar\MinuEpood\Database1.mdf;Integrated Security=True");
         private SqlCommand _command;
         private SqlDataAdapter _adapterToode, _adapterKategooria;
-        public string SaveFileName = "";
+        public string SavePictureFileName = "";
 
         public Form1()
         {
             InitializeComponent();
-            NaitaAndmed();
-            NaitaKategooriad();
+            UpdateEverything();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void LisaKategooria_Click(object sender, EventArgs e)
         {
             var categoryExists = false;
             foreach (var item in Kat_Box.Items)
@@ -42,7 +41,7 @@ namespace MinuEpood
                 _command.ExecuteNonQuery();
                 _conn.Close();
                 Kat_Box.Items.Clear();
-                NaitaKategooriad();
+                UpdateEverything();
             }
             else
             {
@@ -50,7 +49,7 @@ namespace MinuEpood
             }
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void KustutaKategooria_Click(object sender, EventArgs e)
         {
             if (Kat_Box.SelectedItem != null)
             {
@@ -61,11 +60,11 @@ namespace MinuEpood
                 _command.ExecuteNonQuery();
                 _conn.Close();
                 Kat_Box.Items.Clear();
-                NaitaKategooriad();
+                UpdateEverything();
             }
         }
 
-        private void button3_Click(object sender, EventArgs e)
+        private void OpenPicture_Click(object sender, EventArgs e)
         {
             var open = new OpenFileDialog();
             open.InitialDirectory = @"C:\Users\opilane\Pictures";
@@ -83,10 +82,10 @@ namespace MinuEpood
                 if (save.ShowDialog() == DialogResult.OK && Toode_txt.Text != null)
                 {
                     File.Copy(open.FileName, save.FileName);
-                    pictureBox1.Image = Image.FromFile(save.FileName);
+                    Toode_pb.Image = Image.FromFile(save.FileName);
                 }
 
-                SaveFileName = open.FileName;
+                SavePictureFileName = open.FileName;
             }
             else
             {
@@ -106,15 +105,10 @@ namespace MinuEpood
                 {
                     Kat_Box.Items.Add(item["Nimetus"]);
                 }
-                else
-                {
-                    _command = new SqlCommand("DELETE FROM Kategooriad WHERE Id = @id", _conn);
-                    _command.Parameters.AddWithValue("@id", item["Id"]);
-                    _command.ExecuteNonQuery();
-                }
             }
             _conn.Close();
         }
+
 
         private void NaitaAndmed()
         {
@@ -139,7 +133,7 @@ namespace MinuEpood
                 }
             }
             dataGridView1.Columns.Add(comboCategory);
-            pictureBox1.Image = Image.FromFile(Path.Combine(Path.GetFullPath(@"..\..\images"), "peacock.jpg"));
+            Toode_pb.Image = Image.FromFile(Path.Combine(Path.GetFullPath(@"..\..\images"), "peacock.jpg"));
             _conn.Close();
         }
 
@@ -171,7 +165,7 @@ namespace MinuEpood
 
         private void Lisa_Click(object sender, EventArgs e)
         {
-            if (SaveFileName == "")
+            if (SavePictureFileName == "")
             {
                 MessageBox.Show("Palun vali pilt!");
                 return;
@@ -191,20 +185,84 @@ namespace MinuEpood
                     _command.Parameters.AddWithValue("@toode", Toode_txt.Text);
                     _command.Parameters.AddWithValue("@kogus", Kogus_txt.Text);
                     _command.Parameters.AddWithValue("@hind", Hind_txt.Text);
-                    var extension = Path.GetExtension(SaveFileName);
+                    var extension = Path.GetExtension(SavePictureFileName);
                     _command.Parameters.AddWithValue("@pilt", Toode_txt.Text + extension);
-                    var imageData = File.ReadAllBytes(SaveFileName);
+                    var imageData = File.ReadAllBytes(SavePictureFileName);
                     _command.Parameters.AddWithValue("@bpilt", imageData);
                     _command.Parameters.AddWithValue("@kat", Id);
                     _command.ExecuteNonQuery();
                     _conn.Close();
-                    NaitaAndmed();
+                    UpdateEverything();
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show(ex.ToString());
                     _conn.Close();
                 }
+            }
+        }
+
+        private void Puhasta_Click(object sender, EventArgs e)
+        {
+            Toode_txt.Text = "";
+            Kogus_txt.Text = "";
+            Hind_txt.Text = "";
+            Kat_Box.SelectedItem = null;
+            using (FileStream fs = new FileStream(Path.Combine(Path.GetFullPath(@"..\..\Images"), "peacock.png"), FileMode.Open, FileAccess.Read))
+            {
+                Toode_pb.Image = Image.FromStream(fs);
+            }
+        }
+
+        private void Kustuta_Click(object sender, EventArgs e)
+        {
+            var Id = Convert.ToInt32(dataGridView1.SelectedCells[0].OwningRow.Cells["Id"].Value);
+            MessageBox.Show(Id.ToString());
+            if (Id != 0)
+            {
+                _conn.Open();
+                _command = new SqlCommand("DELETE FROM Tooded WHERE Id = @id", _conn);
+                _command.Parameters.AddWithValue("@id", Id);
+                _command.ExecuteNonQuery();
+                _conn.Close();
+                UpdateEverything();
+
+                MessageBox.Show("Toode kustutatud!");
+            }
+            else
+            {
+                MessageBox.Show("Palun vali toode, mida soovid kustutada!");
+            }
+        }
+
+        private void Uuenda_Click(object sender, EventArgs e)
+        {
+            if (SavePictureFileName == "")
+            {
+                MessageBox.Show("Palun vali pilt!");
+                return;
+            }
+
+            if (Toode_txt.Text != "" && Kogus_txt.Text != "" && Hind_txt.Text != "")
+            {
+                var Id = Convert.ToInt32(dataGridView1.SelectedCells[0].OwningRow.Cells["Id"].Value);
+                _conn.Open();
+                _command = new SqlCommand("UPDATE Tooded SET Nimetus=@toode, Kogus=@kogus, " +
+                    "Hind=@hind, Pilt=@pilt WHERE Id=@id", _conn);
+                _command.Parameters.AddWithValue("@id", Id);
+                _command.Parameters.AddWithValue("@toode", Toode_txt.Text);
+                _command.Parameters.AddWithValue("@kogus", Kogus_txt.Text);
+                _command.Parameters.AddWithValue("@hind", Hind_txt.Text.Replace(",", "."));
+                var extension = Path.GetExtension(SavePictureFileName);
+                _command.Parameters.AddWithValue("@pilt", Toode_txt.Text + extension);
+                _command.ExecuteNonQuery();
+                _conn.Close();
+                UpdateEverything();
+                MessageBox.Show("Toode uuendatud!");
+            }
+            else
+            {
+                MessageBox.Show("Palun täida kõik väljad!");
             }
         }
 
@@ -228,6 +286,106 @@ namespace MinuEpood
 
             _popupForm.Location = pos;
             _popupForm.Show();
+        }
+
+        private void UpdateEverything()
+        {
+            NaitaKategooriad();
+            NaitaAndmed();
+            UuendaPood();
+        }
+
+        private void UuendaPood()
+        {
+            tabControl1.TabPages.Clear();
+
+            _conn.Open();
+            var categoryTable = new DataTable();
+            var categoryAdapter = new SqlDataAdapter("SELECT Id, Nimetus FROM Kategooriad", _conn);
+            categoryAdapter.Fill(categoryTable);
+            _conn.Close();
+
+            foreach (DataRow categoryRow in categoryTable.Rows)
+            {
+                string categoryName = categoryRow["Nimetus"].ToString();
+                int categoryId = Convert.ToInt32(categoryRow["Id"]);
+
+                var tabPage = new TabPage(categoryName);
+                tabControl1.TabPages.Add(tabPage);
+
+                var flowLayoutPanel = new FlowLayoutPanel();
+                flowLayoutPanel.Dock = DockStyle.Fill;
+                flowLayoutPanel.AutoScroll = true;
+                tabPage.Controls.Add(flowLayoutPanel);
+
+                _conn.Open();
+                var itemTable = new DataTable();
+                var itemAdapter = new SqlDataAdapter("SELECT Id, Nimetus, Pilt FROM Tooded WHERE KategooriaId = @categoryId", _conn);
+                itemAdapter.SelectCommand.Parameters.AddWithValue("@categoryId", categoryId);
+                itemAdapter.Fill(itemTable);
+                _conn.Close();
+
+                foreach (DataRow itemRow in itemTable.Rows)
+                {
+                    string itemName = itemRow["Nimetus"].ToString();
+                    string itemImageFileName = itemRow["Pilt"].ToString();
+
+                    var itemPanel = new Panel();
+                    itemPanel.Size = new Size(150, 200);
+                    itemPanel.Padding = new Padding(5);
+                    flowLayoutPanel.Controls.Add(itemPanel);
+
+                    var pictureBox = new PictureBox();
+                    pictureBox.Size = new Size(100, 100);
+                    pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
+
+                    string imagePath = Path.Combine(Path.GetFullPath(@"..\..\images"), itemImageFileName);
+                    if (File.Exists(imagePath))
+                    {
+                        pictureBox.Image = Image.FromFile(imagePath);
+                    }
+                    else
+                    {
+                        pictureBox.Image = Image.FromFile(Path.Combine(Path.GetFullPath(@"..\..\images"), "peacock.jpg"));
+                    }
+
+                    itemPanel.Controls.Add(pictureBox);
+
+                    var nameLabel = new Label();
+                    nameLabel.Text = itemName;
+                    nameLabel.AutoSize = true;
+                    nameLabel.TextAlign = ContentAlignment.MiddleCenter;
+                    nameLabel.Location = new Point(0, pictureBox.Bottom + 5);
+                    itemPanel.Controls.Add(nameLabel);
+                }
+            }
+        }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var row = dataGridView1.Rows[e.RowIndex];
+
+            Toode_txt.Text = row.Cells["Nimetus"].Value.ToString();
+            Kogus_txt.Text = row.Cells["Kogus"].Value.ToString();
+            Hind_txt.Text = row.Cells["Hind"].Value.ToString();
+
+            var categoryName = row.Cells["Kategooria_Nimetus"].Value.ToString();
+            Kat_Box.SelectedItem = categoryName;
+
+            var imageFileName = row.Cells["Pilt"].Value.ToString();
+            string imagePath = Path.Combine(Path.GetFullPath(@"..\..\images"), imageFileName);
+
+            if (File.Exists(imagePath))
+            {
+                Toode_pb.Image = Image.FromFile(imagePath);
+                SavePictureFileName = imageFileName;
+            }
+            else
+            {
+                Toode_pb.Image = Image.FromFile(Path.Combine(Path.GetFullPath(@"..\..\images"), "peacock.jpg"));
+            }
         }
     }
 }
